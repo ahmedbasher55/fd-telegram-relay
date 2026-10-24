@@ -62,7 +62,7 @@ def ask(text):
     hist = HISTORY.read_text(encoding="utf-8")[-6000:] if HISTORY.exists() else ""
     prompt = f"<history>\n{hist}\n</history>\n\nAhmed (Telegram): {text}"
     r = subprocess.run(["claude", "-p", prompt, "--output-format", "json", "--permission-mode", "bypassPermissions",
-                        "--append-system-prompt", SYSTEM], cwd=WORK, capture_output=True, text=True, timeout=3000)
+                        "--model", "sonnet", "--append-system-prompt", SYSTEM], cwd=WORK, capture_output=True, text=True, timeout=3000)
     try:
         return (json.loads(r.stdout).get("result") or "").strip() or "(مافيش رد)"
     except ValueError:

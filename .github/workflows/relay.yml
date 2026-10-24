@@ -33,12 +33,19 @@ jobs:
           repository: ahmedbasher55/first-dollar-online
           token: ${{ secrets.WORK_REPO_TOKEN }}
           path: work
+          fetch-depth: 1
 
-      - name: Install Claude Code and project deps
+      - name: Cache Claude Code install
         if: steps.check.outputs.new == '1'
-        run: |
-          npm install -g @anthropic-ai/claude-code > /dev/null 2>&1
-          pip install -q -r work/requirements.txt > /dev/null 2>&1 || true
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: claude-code-npm-v1
+
+      - name: Install Claude Code
+        if: steps.check.outputs.new == '1'
+        # project Python deps are installed on demand by Claude itself, so a plain question stays fast
+        run: npm install -g --prefer-offline --no-audit --no-fund @anthropic-ai/claude-code > /dev/null 2>&1
 
       - name: Answer with Claude
         if: steps.check.outputs.new == '1'
