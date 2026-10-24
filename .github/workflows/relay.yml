@@ -1,0 +1,60 @@
+name: telegram-relay
+# Checks Ahmed's Telegram bot every 5 minutes; when there is a message, runs Claude Code (his subscription token)
+# on the private project repo and replies. Logs are public: the scripts never print message content.
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: relay
+  cancel-in-progress: false
+
+jobs:
+  relay:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Any new message?
+        id: check
+        env:
+          TG_TOKEN: ${{ secrets.TG_TOKEN }}
+          TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
+        run: |
+          python relay.py --check
+          echo "new=$(cat has_messages)" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout private project
+        if: steps.check.outputs.new == '1'
+        uses: actions/checkout@v4
+        with:
+          repository: ahmedbasher55/first-dollar-online
+          token: ${{ secrets.WORK_REPO_TOKEN }}
+          path: work
+
+      - name: Install Claude Code and project deps
+        if: steps.check.outputs.new == '1'
+        run: |
+          npm install -g @anthropic-ai/claude-code > /dev/null 2>&1
+          pip install -q -r work/requirements.txt > /dev/null 2>&1 || true
+
+      - name: Answer with Claude
+        if: steps.check.outputs.new == '1'
+        env:
+          TG_TOKEN: ${{ secrets.TG_TOKEN }}
+          TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          WORK_DIR: work
+        run: python relay.py
+
+      - name: Save Claude's work to the project repo
+        if: steps.check.outputs.new == '1'
+        working-directory: work
+        run: |
+          git config user.name "Claude (cloud relay)"
+          git config user.email "a_basher2000@hotmail.com"
+          git add -A
+          git commit -q -m "Telegram request handled in the cloud" || exit 0
+          git pull -q --rebase origin main && git push -q origin main
